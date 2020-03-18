@@ -20,9 +20,10 @@
 
 const std = @import("std");
 
-pub const geo = @import("./src/geometry.zig");
-pub const color_picker = @import("./src/color_picker.zig");
-pub const contrast = @import("./src/contrast.zig");
+const internal = @import("./src/internal.zig");
+pub const geo = internal.geo;
+pub const color_picker = internal.color_picker;
+pub const contrast = internal.contrast;
 
 const m = [3][3]f64{
     [3]f64{ 3.240969941904521, -1.537383177570093, -0.498610760293 },
@@ -45,7 +46,7 @@ const refV = 0.46831999493879;
 const kappa = 903.2962962;
 const epsilon = 0.0088564516;
 
-const hexChars = "0123456789abcdef";
+const hex_chars = "0123456789abcdef";
 
 /// For a given lightness, return a list of 6 lines in slope-intercept
 /// form that represent the bounds in CIELUV, stepping over which will
@@ -89,7 +90,7 @@ pub fn getBounds(L: f64) [3 * 2]geo.Line {
 /// gamut.
 pub fn maxSafeChromaForL(L: f64) f64 {
     const bounds = getBounds(L);
-    var min: f64 = std.math.POSITIVE_INFINITY;
+    var min: f64 = std.math.inf_f64;
 
     for (bounds) |bound| {
         const length: f64 = geo.distanceLineFromOrigin(bound);
@@ -385,15 +386,16 @@ pub fn lchToHpluv(tuple: [3]f64) [3]f64 {
 /// RGB values are ranging in [0;1].
 /// @param tuple An array containing the color's RGB values.
 /// @return A string containing a `#RRGGBB` representation of given color.
-pub fn rgbToHex(tuple: [3]f64) []u8 {
-    var h: []u8 = "#";
+pub fn rgbToHex(tuple: [3]f64) [7]u8 {
+    var h = [7]u8{ '#', '0', '0', '0', '0', '0', '0' };
 
-    for (tuple) |x| {
+    for (tuple) |x, i| {
         var chan: f64 = x;
-        var c = std.math.round(chan * 255);
+        var c = @floatToInt(u8, std.math.round(chan * 255));
         var digit2 = c % 16;
-        var digit1 = Std.int((c - digit2) / 16);
-        h += hexChars.charAt(digit1) + hexChars.charAt(digit2);
+        var digit1 = (c - digit2) / 16;
+        h[i * 2 + 1] = hex_chars[digit1];
+        h[i * 2 + 2] = hex_chars[digit2];
     }
 
     return h;
@@ -402,14 +404,13 @@ pub fn rgbToHex(tuple: [3]f64) []u8 {
 /// RGB values are ranging in [0;1].
 /// @param hex A `#RRGGBB` representation of a color.
 /// @return An array containing the color's RGB values.
-pub fn hexToRgb(hex: []u8) [3]f64 {
-    hex = hex.toLowerCase();
-    var ret: [3]f64 = undefined ** 3;
-    for (ret) |r| {
-        var digit1 = hexChars.indexOf(hex.charAt(i * 2 + 1));
-        var digit2 = hexChars.indexOf(hex.charAt(i * 2 + 2));
-        var n = digit1 * 16 + digit2;
-        r = (n / 255.0);
+pub fn hexToRgb(hex: []const u8) [3]f64 {
+    var ret = [3]f64{ undefined, undefined, undefined };
+    for (ret) |*r, i| {
+        var digit1 = std.ascii.indexOfIgnoreCase(hex_chars, &[1]u8{hex[i * 2 + 1]});
+        var digit2 = std.ascii.indexOfIgnoreCase(hex_chars, &[1]u8{hex[i * 2 + 2]});
+        var n = digit1.? * 16 + digit2.?;
+        r.* = (@intToFloat(f64, n) / 255.0);
     }
     return ret;
 }
@@ -463,24 +464,24 @@ pub fn rgbToHpluv(tuple: [3]f64) [3]f64 {
 /// HSLuv values are ranging in [0;360], [0;100] and [0;100] and RGB in [0;1].
 /// @param tuple An array containing the color's HSL values in HSLuv color space.
 /// @return A string containing a `#RRGGBB` representation of given color.
-pub fn hsluvToHex(tuple: [3]f64) []u8 {
+pub fn hsluvToHex(tuple: [3]f64) [7]u8 {
     return rgbToHex(hsluvToRgb(tuple));
 }
 
-pub fn hpluvToHex(tuple: [3]f64) []u8 {
+pub fn hpluvToHex(tuple: [3]f64) [7]u8 {
     return rgbToHex(hpluvToRgb(tuple));
 }
 
 /// HSLuv values are ranging in [0;360], [0;100] and [0;100] and RGB in [0;1].
 /// @param tuple An array containing the color's HSL values in HPLuv (pastel variant) color space.
 /// @return An array containing the color's HSL values in HSLuv color space.
-pub fn hexToHsluv(s: []u8) [3]f64 {
+pub fn hexToHsluv(s: []const u8) [3]f64 {
     return rgbToHsluv(hexToRgb(s));
 }
 
 /// HSLuv values are ranging in [0;360], [0;100] and [0;100] and RGB in [0;1].
 /// @param hex A `#RRGGBB` representation of a color.
 /// @return An array containing the color's HSL values in HPLuv (pastel variant) color space.
-pub fn hexToHpluv(s: []u8) [3]f64 {
+pub fn hexToHpluv(s: []const u8) [3]f64 {
     return rgbToHpluv(hexToRgb(s));
 }

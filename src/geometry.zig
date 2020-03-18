@@ -1,4 +1,5 @@
 const std = @import("std");
+const math = std.math;
 
 pub const Point = struct {
     x: f64,
@@ -20,12 +21,12 @@ pub fn intersectLineLine(a: Line, b: Line) Point {
 }
 
 pub fn distanceFromOrigin(point: Point) f64 {
-    return Math.sqrt(Math.pow(point.x, 2) + Math.pow(point.y, 2));
+    return math.sqrt(f64, math.pow(f64, point.x, 2) + math.pow(f64, point.y, 2));
 }
 
 pub fn distanceLineFromOrigin(line: Line) f64 {
     // https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
-    return Math.abs(line.intercept) / Math.sqrt(Math.pow(line.slope, 2) + 1);
+    return math.fabs(line.intercept) / math.sqrt(math.pow(f64, line.slope, 2) + 1);
 }
 
 pub fn perpendicularThroughPoint(line: Line, point: Point) Line {
@@ -38,11 +39,11 @@ pub fn perpendicularThroughPoint(line: Line, point: Point) Line {
 }
 
 pub fn angleFromOrigin(point: Point) Angle {
-    return Math.atan2(point.y, point.x);
+    return math.atan2(point.y, point.x);
 }
 
 pub fn normalizeAngle(angle: Angle) Angle {
-    var m = 2 * Math.PI;
+    var m = 2 * math.pi;
     return ((angle % m) + m) % m;
 }
 
