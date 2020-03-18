@@ -1,5 +1,6 @@
+const std = @import("std");
 const hsluv = @import("../hsluv.zig");
-const geo = @import("geometry");
+const geo = @import("./geometry.zig");
 
 pub const PickerGeometry = struct {
     var lines: []Line;
@@ -34,37 +35,38 @@ pub fn getPickerGeometry(lightness: f64) PickerGeometry {
     var lines = hsluv.getBounds(lightness);
 
     // Find the line closest to origin
-    var closest_index_2: ?*Line = null;
-    var closest_line_distance: f64 = std.math.positive_infinity;
+    var closest_line_opt: ?*const geo.Line = null;
+    var closest_line_distance = std.math.inf_f64;
 
     for (lines) |line, i| {
         const d = geo.distanceLineFromOrigin(line);
         if (d < closest_line_distance) {
             closest_line_distance = d;
-            closest_index_2 = i;
+            closest_line_opt = &line;
         }
     }
+    std.debug.assert(closest_line_opt != null);
+    const closest_line = closest_line_opt.?;
 
     const starting_angle = blk: {
-        const closest_line = lines[closest_index_2];
-        const perpendicular_line = Line{ .slope = 0 - (1 / closest_line.slope), .intercept = 0.0 };
-        const intersection_point = geo.intersectLineLine(closest_line, perpendicular_line);
+        const perpendicular_line = geo.Line{ .slope = 0 - (1 / closest_line.slope), .intercept = 0.0 };
+        const intersection_point = geo.intersectLineLine(closest_line.*, perpendicular_line);
         break :blk geo.angleFromOrigin(intersection_point);
     };
 
-    var intersections = []Intersections;
+    var intersections = []geo.Point;
 
     const num_lines = lines.len;
-    var i1 = 0;
-    while (i1 < num_lines - 1) : (i1 += 1) {
-        var i2 = i1 + 1;
-        while (i2 < num_lines) : (i2 += 1) {
-            const intersection_point = geo.intersectLineLine(lines[i1], lines[i2]);
+    var i = 0;
+    while (i < num_lines - 1) : (i += 1) {
+        var j = i + 1;
+        while (j < num_lines) : (j += 1) {
+            const intersection_point = geo.intersectLineLine(lines[i], lines[j]);
             const intersection_point_angle = geo.angleFromOrigin(intersection_point);
             const relative_angle = intersection_point_angle - starting_angle;
             intersections.push(Intersection{
-                .line1 = i1,
-                .line2 = i2,
+                .line1 = i,
+                .line2 = j,
                 .intersection_point = intersection_point,
                 .intersection_point_angle = intersection_point_angle,
                 .relative_angle = geo.normalizeAngle(intersection_point_angle - starting_angle),
@@ -78,29 +80,25 @@ pub fn getPickerGeometry(lightness: f64) PickerGeometry {
     var ordered_vertices = []geo.Point;
     var ordered_angles = []f64;
 
-    var next_index_2;
-    var current_intersection;
-    var intersection_point_distance;
-
-    var currenct_index_2 = closest_index_2;
+    var currenct_index_2 = closest_line;
 
     var outer_circle_radius: f64 = 0.0;
     for (intersections) |intersection| {
-        current_intersection = intersection;
-        next_index_2 = null;
-        if (current_intersection.line1 == currenct_index_2) {
-            next_index_2 = current_intersection.line2;
-        } else if (current_intersection.line2 == currenct_index_2) {
-            next_index_2 = current_intersection.line1;
-        }
-        if (next_index_2 != null) {
-            currenct_index_2 = next_index_2;
+        var next_index: ?geo.Line = if (intersection.line1 == currenct_index_2)
+            intersection.line2
+        else if (intersection.line2 == currenct_index_2)
+            intersection.line1
+        else
+            null;
 
-            ordered_lines.push(lines[next_index_2]);
-            ordered_vertices.push(current_intersection.intersection_point);
-            ordered_angles.push(current_intersection.intersection_point_angle);
+        if (next_index) |next| {
+            currenct_index_2 = next;
 
-            intersection_point_distance = geo.distanceFromOrigin(current_intersection.intersection_point);
+            ordered_lines.push(lines[next]);
+            ordered_vertices.push(intersection.intersection_point);
+            ordered_angles.push(intersection.intersection_point_angle);
+
+            const intersection_point_distance = geo.distanceFromOrigin(intersection.intersection_point);
             if (intersection_point_distance > outer_circle_radius) {
                 outer_circle_radius = intersection_point_distance;
             }
@@ -120,7 +118,7 @@ pub fn closestPoint(geometry: PickerGeometry, point: Point) Point {
     // In order to find the closest line we use the point's angle
     const angle_from_origin = geo.angleFromOrigin(point);
     const num_vertices = geometry.vertices.length;
-    var smallest_relative_angle = Math.PI * 2;
+    var smallest_relative_angle = math.pi * 2;
     var index1 = 0;
 
     for (geometry.angles) |gang, i| {
