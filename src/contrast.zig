@@ -1,4 +1,4 @@
-const hsluv = @import("hsluv");
+const hsluv = @import("../hsluv.zig");
 
 pub const W3C_CONTRAST_TEXT = 4.5;
 pub const W3C_CONTRAST_LARGE_TEXT = 3;

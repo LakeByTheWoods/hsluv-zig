@@ -1,4 +1,4 @@
-const hsluv = @import("hsluv");
+const hsluv = @import("../hsluv.zig");
 const geo = @import("geometry");
 
 pub const PickerGeometry = struct {
