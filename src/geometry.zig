@@ -21,7 +21,7 @@ pub fn intersectLineLine(a: Line, b: Line) Point {
 }
 
 pub fn distanceFromOrigin(point: Point) f64 {
-    return math.sqrt(f64, math.pow(f64, point.x, 2) + math.pow(f64, point.y, 2));
+    return math.sqrt(math.pow(f64, point.x, 2) + math.pow(f64, point.y, 2));
 }
 
 pub fn distanceLineFromOrigin(line: Line) f64 {
@@ -39,12 +39,12 @@ pub fn perpendicularThroughPoint(line: Line, point: Point) Line {
 }
 
 pub fn angleFromOrigin(point: Point) Angle {
-    return math.atan2(point.y, point.x);
+    return math.atan2(f64, point.y, point.x);
 }
 
 pub fn normalizeAngle(angle: Angle) Angle {
-    var m = 2 * math.pi;
-    return ((angle % m) + m) % m;
+    const m = 2 * math.pi;
+    return @rem(((@rem(angle, m)) + m), m); // TODO: Should this be rem or mod?
 }
 
 pub fn lengthOfRayUntilIntersect(theta: Angle, line: Line) f64 {

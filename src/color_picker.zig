@@ -3,34 +3,40 @@ const hsluv = @import("../hsluv.zig");
 const geo = @import("./geometry.zig");
 
 pub const PickerGeometry = struct {
-    var lines: []Line;
+    lines: std.ArrayList(geo.Line),
     // Ordered such that 1st vertex is interection between first and
     // second line, 2nd vertex between second and third line etc.
-    var vertices: []Point;
+    vertices: std.ArrayList(geo.Point),
     // Angles from origin to corresponding vertex
-    var angles: []Angle;
+    angles: std.ArrayList(geo.Angle),
     // Smallest circle with center at origin such that polygon fits inside
-    var outer_circle_radius: f64;
+    outer_circle_radius: f64,
     // Largest circle with center at origin such that it fits inside polygon
-    var inner_circle_radius: f64;
+    inner_circle_radius: f64,
+
+    pub fn deinit(self: *const PickerGeometry) void {
+        self.lines.deinit();
+        self.vertices.deinit();
+        self.angles.deinit();
+    }
 };
 
 const Intersection = struct {
-    line1: geo.Line,
-    line2: geo.Line,
+    line1: *const geo.Line,
+    line2: *const geo.Line,
     intersection_point: geo.Point,
     intersection_point_angle: f64,
     relative_angle: f64,
 };
-pub fn intersectionCompare(a: Intersection, b: Intersection) Bool {
+pub fn intersectionCompareLessThan(a: Intersection, b: Intersection) bool {
     if (a.relative_angle > b.relative_angle) {
-        return 1;
+        return false;
     } else {
-        return -1;
+        return true;
     }
 }
 
-pub fn getPickerGeometry(lightness: f64) PickerGeometry {
+pub fn getPickerGeometry(allocator: *std.mem.Allocator, lightness: f64) error{OutOfMemory}!PickerGeometry {
     // Array of lines
     var lines = hsluv.getBounds(lightness);
 
@@ -54,49 +60,55 @@ pub fn getPickerGeometry(lightness: f64) PickerGeometry {
         break :blk geo.angleFromOrigin(intersection_point);
     };
 
-    var intersections = []geo.Point;
+    var intersections = std.ArrayList(Intersection).init(allocator);
+    defer intersections.deinit();
 
     const num_lines = lines.len;
-    var i = 0;
+    var i: usize = 0;
     while (i < num_lines - 1) : (i += 1) {
         var j = i + 1;
         while (j < num_lines) : (j += 1) {
             const intersection_point = geo.intersectLineLine(lines[i], lines[j]);
             const intersection_point_angle = geo.angleFromOrigin(intersection_point);
             const relative_angle = intersection_point_angle - starting_angle;
-            intersections.push(Intersection{
-                .line1 = i,
-                .line2 = j,
-                .intersection_point = intersection_point,
-                .intersection_point_angle = intersection_point_angle,
-                .relative_angle = geo.normalizeAngle(intersection_point_angle - starting_angle),
-            });
+            _ = try intersections.append(
+                .{
+                    .line1 = &lines[i],
+                    .line2 = &lines[j],
+                    .intersection_point = intersection_point,
+                    .intersection_point_angle = intersection_point_angle,
+                    .relative_angle = geo.normalizeAngle(intersection_point_angle - starting_angle),
+                },
+            );
         }
     }
 
-    intersections.sort();
+    std.sort.sort(Intersection, intersections.span(), intersectionCompareLessThan);
 
-    var ordered_lines = []geo.Line;
-    var ordered_vertices = []geo.Point;
-    var ordered_angles = []f64;
+    var ordered_lines = try std.ArrayList(geo.Line).initCapacity(allocator, intersections.len);
+    errdefer ordered_lines.deinit();
+    var ordered_vertices = try std.ArrayList(geo.Point).initCapacity(allocator, intersections.len);
+    errdefer ordered_vertices.deinit();
+    var ordered_angles = try std.ArrayList(f64).initCapacity(allocator, intersections.len);
+    errdefer ordered_angles.deinit();
 
     var currenct_index_2 = closest_line;
 
     var outer_circle_radius: f64 = 0.0;
-    for (intersections) |intersection| {
-        var next_index: ?geo.Line = if (intersection.line1 == currenct_index_2)
+    for (intersections.span()) |intersection| {
+        var next_line: ?*const geo.Line = if (intersection.line1 == currenct_index_2)
             intersection.line2
         else if (intersection.line2 == currenct_index_2)
             intersection.line1
         else
             null;
 
-        if (next_index) |next| {
+        if (next_line) |next| {
             currenct_index_2 = next;
 
-            ordered_lines.push(lines[next]);
-            ordered_vertices.push(intersection.intersection_point);
-            ordered_angles.push(intersection.intersection_point_angle);
+            _ = try ordered_lines.append(next.*);
+            _ = try ordered_vertices.append(intersection.intersection_point);
+            _ = try ordered_angles.append(intersection.intersection_point_angle);
 
             const intersection_point_distance = geo.distanceFromOrigin(intersection.intersection_point);
             if (intersection_point_distance > outer_circle_radius) {
