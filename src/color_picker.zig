@@ -28,7 +28,8 @@ const Intersection = struct {
     intersection_point_angle: f64,
     relative_angle: f64,
 };
-pub fn intersectionCompareLessThan(a: Intersection, b: Intersection) bool {
+
+pub fn intersectionCompareLessThan(ctx: void, a: Intersection, b: Intersection) bool {
     if (a.relative_angle > b.relative_angle) {
         return false;
     } else {
@@ -83,13 +84,13 @@ pub fn getPickerGeometry(allocator: *std.mem.Allocator, lightness: f64) error{Ou
         }
     }
 
-    std.sort.sort(Intersection, intersections.span(), intersectionCompareLessThan);
+    std.sort.sort(Intersection, intersections.span(), {}, intersectionCompareLessThan);
 
-    var ordered_lines = try std.ArrayList(geo.Line).initCapacity(allocator, intersections.len);
+    var ordered_lines = try std.ArrayList(geo.Line).initCapacity(allocator, intersections.items.len);
     errdefer ordered_lines.deinit();
-    var ordered_vertices = try std.ArrayList(geo.Point).initCapacity(allocator, intersections.len);
+    var ordered_vertices = try std.ArrayList(geo.Point).initCapacity(allocator, intersections.items.len);
     errdefer ordered_vertices.deinit();
-    var ordered_angles = try std.ArrayList(f64).initCapacity(allocator, intersections.len);
+    var ordered_angles = try std.ArrayList(f64).initCapacity(allocator, intersections.items.len);
     errdefer ordered_angles.deinit();
 
     var currenct_index_2 = closest_line;
